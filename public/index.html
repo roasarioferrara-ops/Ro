@@ -22,7 +22,7 @@
 
       <!-- Gespeicherte eigene Termine auf diesem Gerät -->
       <section class="card" id="mine" hidden>
-        <h2 class="step-head">Ihre Termine</h2>
+        <h2 class="step-head">Deine Termine</h2>
         <div id="mine-list"></div>
       </section>
 
@@ -33,10 +33,10 @@
         </section>
 
         <section class="card step" id="step-time">
-          <div class="step-head"><span class="step-num" data-step>2</span><h2>Wann passt es Ihnen?</h2></div>
+          <div class="step-head"><span class="step-num" data-step>2</span><h2>Wann passt es dir?</h2></div>
           <div id="slots-loading" class="empty">Freie Termine werden geladen …</div>
           <div id="slots-empty" class="empty" hidden>
-            Zurzeit sind leider keine Termine frei.<br>Schauen Sie bald wieder vorbei oder rufen Sie kurz an.
+            Zurzeit sind leider keine Termine frei.<br>Schau bald wieder vorbei oder ruf kurz an.
           </div>
           <div id="slots-ui" hidden>
             <div class="days" id="days" role="tablist" aria-label="Tag"></div>
@@ -46,8 +46,8 @@
         </section>
 
         <section class="card step is-locked" id="step-details">
-          <div class="step-head"><span class="step-num" data-step>3</span><h2>Ihre Angaben</h2></div>
-          <p class="muted small" id="details-hint">Bitte wählen Sie zuerst einen Termin.</p>
+          <div class="step-head"><span class="step-num" data-step>3</span><h2>Deine Angaben</h2></div>
+          <p class="muted small" id="details-hint">Bitte wähl zuerst einen Termin.</p>
           <form id="form" hidden novalidate>
             <div class="summary" id="summary"></div>
             <div id="form-error" class="alert alert-error" role="alert" hidden></div>
@@ -58,11 +58,12 @@
             <div class="field">
               <label for="phone">Telefon</label>
               <input id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required maxlength="30">
-              <span class="hint">Nur falls ich Sie kurzfristig erreichen muss.</span>
+              <span class="hint">Nur falls ich dich kurzfristig erreichen muss.</span>
             </div>
             <div class="field">
               <label for="email">E-Mail <span class="muted">(freiwillig)</span></label>
-              <input id="email" name="email" type="email" autocomplete="email" maxlength="200">
+              <input id="email" name="email" type="email" autocomplete="email" maxlength="200" aria-describedby="email-hint">
+              <span class="hint" id="email-hint" hidden>Dann bekommst du eine Bestätigung per E-Mail.</span>
             </div>
             <div class="field">
               <label for="note">Nachricht <span class="muted">(freiwillig)</span></label>

@@ -4,6 +4,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const express = require('express');
 const { openDatabase } = require('./db');
+const { createMailerFromEnv, bookingConfirmation } = require('./mail');
 const L = require('./lib');
 
 const SESSION_DAYS = 30;
@@ -39,9 +40,20 @@ function toInt(value, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function createApp({ db, adminPassword, timeZone = 'Europe/Berlin', clock = () => Date.now(), trustProxy = 1 }) {
+function createApp({
+  db,
+  adminPassword,
+  timeZone = 'Europe/Berlin',
+  clock = () => Date.now(),
+  trustProxy = 1,
+  sendMail = null, // Funktion zum Verschicken von E-Mails (siehe mail.js) oder null
+  publicUrl = null, // Adresse der Webseite, z. B. https://termine.mein-salon.de – für Links in E-Mails
+}) {
   if (!adminPassword) throw new Error('adminPassword fehlt');
   const passwordHash = sha256(adminPassword);
+  // E-Mails nur mit fester Adresse der Webseite, damit Links darin nie von einer Anfrage abhängen.
+  const siteUrl = publicUrl ? String(publicUrl).replace(/\/+$/, '') : null;
+  const mailEnabled = Boolean(sendMail && siteUrl);
 
   const app = express();
   app.disable('x-powered-by');
@@ -96,8 +108,8 @@ function createApp({ db, adminPassword, timeZone = 'Europe/Berlin', clock = () =
     const phone = L.cleanText(body.phone, 30);
     const email = L.cleanText(body.email, 200);
     const note = L.cleanText(body.note, 500);
-    if (name.length < 2) fail(400, 'Bitte geben Sie Ihren Namen ein.');
-    if (requirePhone && !phone) fail(400, 'Bitte geben Sie Ihre Telefonnummer ein.');
+    if (name.length < 2) fail(400, 'Bitte gib einen Namen ein.');
+    if (requirePhone && !phone) fail(400, 'Bitte gib eine Telefonnummer ein.');
     if (phone && !L.isPlausiblePhone(phone)) fail(400, 'Die Telefonnummer sieht nicht richtig aus.');
     if (email && !L.isPlausibleEmail(email)) fail(400, 'Die E-Mail-Adresse sieht nicht richtig aus.');
     return { name, phone: phone || null, email: email || null, note: note || null };
@@ -156,6 +168,7 @@ function createApp({ db, adminPassword, timeZone = 'Europe/Berlin', clock = () =
       infoText: s.info_text,
       legalText: s.legal_text,
       cancelUntilHours: toInt(s.cancel_until_hours, 3),
+      emailConfirmation: mailEnabled,
       services: publicServices(),
     });
   });
@@ -178,22 +191,22 @@ function createApp({ db, adminPassword, timeZone = 'Europe/Berlin', clock = () =
   app.post('/api/bookings', (req, res) => {
     const body = req.body || {};
     if (body.website) fail(400, 'Ungültige Anfrage.'); // Honeypot gegen Spam-Bots
-    if (body.consent !== true) fail(400, 'Bitte stimmen Sie der Speicherung Ihrer Daten zu.');
+    if (body.consent !== true) fail(400, 'Bitte stimm der Speicherung deiner Angaben zu.');
     const customer = readCustomer(body, { requirePhone: true });
 
     const services = publicServices();
     let service = null;
     if (services.length > 0) {
       service = services.find((x) => x.id === toInt(body.serviceId, -1));
-      if (!service) fail(400, 'Bitte wählen Sie eine Leistung aus.');
+      if (!service) fail(400, 'Bitte wähl eine Leistung aus.');
     }
 
-    if (!bookingLimiter(req.ip, clock())) fail(429, 'Zu viele Buchungen. Bitte rufen Sie mich kurz an.');
+    if (!bookingLimiter(req.ip, clock())) fail(429, 'Zu viele Buchungen. Bitte ruf kurz an.');
 
     const s = settings();
     const result = db.transaction(() => {
       const slot = freeSlot(body.slotId);
-      if (!slot) fail(409, 'Dieser Termin ist leider schon vergeben. Bitte wählen Sie einen anderen.');
+      if (!slot) fail(409, 'Dieser Termin ist leider schon vergeben. Bitte wähl einen anderen.');
       const start = `${slot.date} ${slot.time}`;
       const tooLate = start <= nowStamp(toInt(s.booking_lead_minutes, 60));
       const tooEarly = slot.date > L.addDays(today(), toInt(s.booking_days_ahead, 60));
@@ -210,13 +223,34 @@ function createApp({ db, adminPassword, timeZone = 'Europe/Berlin', clock = () =
       return { ...created, slot };
     })();
 
+    const willMail = mailEnabled && Boolean(customer.email);
     res.status(201).json({
       token: result.token,
       date: result.slot.date,
       time: result.slot.time,
       duration: result.slot.duration_min,
       serviceName: service ? service.name : null,
+      confirmationEmail: willMail,
     });
+
+    if (willMail) {
+      // Erst nach der Antwort verschicken: Ein Fehler beim Versand ändert nichts an der Buchung.
+      const message = bookingConfirmation({
+        salonName: s.salon_name,
+        customerName: customer.name,
+        email: customer.email,
+        token: result.token,
+        date: result.slot.date,
+        time: result.slot.time,
+        duration: result.slot.duration_min,
+        serviceName: service ? service.name : null,
+        price: service ? service.price : null,
+        manageUrl: `${siteUrl}/termin/${result.token}`,
+      });
+      Promise.resolve()
+        .then(() => sendMail(message))
+        .catch((err) => console.error('Bestätigung per E-Mail fehlgeschlagen:', err.message));
+    }
   });
 
   function bookingByToken(token) {
@@ -251,7 +285,7 @@ function createApp({ db, adminPassword, timeZone = 'Europe/Berlin', clock = () =
   app.post('/api/bookings/:token/cancel', (req, res) => {
     const a = bookingByToken(req.params.token);
     if (a.status === 'cancelled') return res.json({ ok: true, status: 'cancelled' });
-    if (!canCustomerCancel(a)) fail(409, 'Dieser Termin kann online nicht mehr storniert werden. Bitte rufen Sie an.');
+    if (!canCustomerCancel(a)) fail(409, 'Dieser Termin kann online nicht mehr abgesagt werden. Bitte ruf kurz an.');
     db.prepare(
       "UPDATE appointments SET status = 'cancelled', cancelled_at = datetime('now'), cancelled_by = 'customer' WHERE id = ?"
     ).run(a.id);
@@ -752,7 +786,7 @@ function createApp({ db, adminPassword, timeZone = 'Europe/Berlin', clock = () =
       return res.status(400).json({ error: 'Ungültige Anfrage.' });
     }
     console.error(err);
-    res.status(500).json({ error: 'Da ist etwas schiefgelaufen. Bitte versuchen Sie es noch einmal.' });
+    res.status(500).json({ error: 'Da ist etwas schiefgelaufen. Bitte versuch es noch einmal.' });
   });
 
   return app;
@@ -771,11 +805,23 @@ if (require.main === module) {
   }
   const db = openDatabase(process.env.DB_PATH || path.join(__dirname, 'data', 'salon.db'));
   const trustProxy = process.env.TRUST_PROXY === undefined ? 1 : toInt(process.env.TRUST_PROXY, 0);
+  const publicUrl = process.env.PUBLIC_URL || null;
+  const sendMail = createMailerFromEnv(process.env);
+  if (sendMail && !publicUrl) {
+    console.warn('⚠  SMTP ist eingerichtet, aber PUBLIC_URL fehlt – es werden keine Bestätigungen verschickt.');
+  } else if (sendMail) {
+    sendMail
+      .verify()
+      .then(() => console.log('E-Mail-Versand bereit.'))
+      .catch((err) => console.error('⚠  E-Mail-Versand klappt nicht:', err.message));
+  }
   const app = createApp({
     db,
     adminPassword,
     timeZone: process.env.TIMEZONE || 'Europe/Berlin',
     trustProxy,
+    sendMail,
+    publicUrl,
   });
   const port = toInt(process.env.PORT, 3000);
   app.listen(port, () => {

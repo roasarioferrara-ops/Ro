@@ -8,9 +8,9 @@ const { createApp } = require('../server');
 // Feste Uhr: Dienstag, 17.11.2026, 09:00 Uhr in Berlin
 let nowMs = Date.parse('2026-11-17T08:00:00Z');
 
-async function setup() {
+async function setup(options = {}) {
   const db = openDatabase(':memory:');
-  const app = createApp({ db, adminPassword: 'geheim', clock: () => nowMs, trustProxy: false });
+  const app = createApp({ db, adminPassword: 'geheim', clock: () => nowMs, trustProxy: false, ...options });
   const server = await new Promise((resolve) => {
     const s = app.listen(0, () => resolve(s));
   });
@@ -260,4 +260,83 @@ test('Buchungsregeln: Vorlauf, Absagefrist, Einstellungen', async (t) => {
   // Abmelden
   await ctx.call('POST', '/api/admin/logout');
   assert.equal((await ctx.call('GET', '/api/admin/me')).status, 401);
+});
+
+test('Bestätigung per E-Mail nach der Online-Buchung', async (t) => {
+  nowMs = Date.parse('2026-11-17T08:00:00Z');
+  const sent = [];
+  const ctx = await setup({ sendMail: async (m) => sent.push(m), publicUrl: 'https://termine.example.de/' });
+  t.after(ctx.close);
+  await ctx.login();
+
+  const info = (await ctx.call('GET', '/api/info')).data;
+  assert.equal(info.emailConfirmation, true);
+  const herren = info.services.find((s) => s.name === 'Herrenhaarschnitt');
+  assert.equal(herren.price, 1000);
+
+  await ctx.call('POST', '/api/admin/slots', { date: '2026-11-24', time: '10:00', duration: 30 });
+  await ctx.call('POST', '/api/admin/slots', { date: '2026-11-24', time: '10:30', duration: 30 });
+  const slots = (await ctx.call('GET', '/api/slots')).data.slots;
+
+  // Ohne E-Mail-Adresse: keine E-Mail
+  const plain = await ctx.call('POST', '/api/bookings', { ...customer, slotId: slots[0].id, serviceId: herren.id });
+  assert.equal(plain.data.confirmationEmail, false);
+
+  // Mit E-Mail-Adresse: Bestätigung mit Absage-Link und Kalendereintrag
+  const booked = await ctx.call('POST', '/api/bookings', {
+    ...customer,
+    name: 'Max\nKlick hier',
+    email: 'max@example.de',
+    slotId: slots[1].id,
+    serviceId: herren.id,
+  });
+  assert.equal(booked.status, 201);
+  assert.equal(booked.data.confirmationEmail, true);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(sent.length, 1);
+  const mail = sent[0];
+  assert.deepEqual(mail.to, { name: 'Max Klick hier', address: 'max@example.de' });
+  assert.equal(mail.fromName, 'Mein Friseursalon');
+  assert.equal(mail.subject, 'Dein Termin am Di, 24.11. um 10:30 Uhr');
+  assert.match(mail.text, /^Hallo Max Klick hier,\n/);
+  assert.match(mail.text, /Dienstag, 24\. November 2026, 10:30 Uhr/);
+  assert.match(mail.text, /Herrenhaarschnitt \(10\s€\)/);
+  assert.ok(mail.text.includes(`https://termine.example.de/termin/${booked.data.token}`));
+  const ics = mail.attachments[0].content;
+  assert.match(ics, /DTSTART:20261124T103000/);
+  assert.match(ics, /DTEND:20261124T110000/);
+
+  // Ungültige Adressen werden abgelehnt (nie mehrere Empfänger)
+  await ctx.call('POST', '/api/admin/slots', { date: '2026-11-24', time: '11:00', duration: 30 });
+  const free = (await ctx.call('GET', '/api/slots')).data.slots;
+  const bad = await ctx.call('POST', '/api/bookings', {
+    ...customer,
+    email: 'a@example.de,b@example.de',
+    slotId: free[0].id,
+    serviceId: herren.id,
+  });
+  assert.equal(bad.status, 400);
+  assert.equal(sent.length, 1);
+});
+
+test('Ohne E-Mail-Einstellungen werden keine E-Mails verschickt', async (t) => {
+  nowMs = Date.parse('2026-11-17T08:00:00Z');
+  const sent = [];
+  // Versand ist eingerichtet, aber ohne feste Adresse der Webseite → aus
+  const ctx = await setup({ sendMail: async (m) => sent.push(m) });
+  t.after(ctx.close);
+  await ctx.login();
+  assert.equal((await ctx.call('GET', '/api/info')).data.emailConfirmation, false);
+  await ctx.call('POST', '/api/admin/slots', { date: '2026-11-24', time: '10:00', duration: 30 });
+  const slots = (await ctx.call('GET', '/api/slots')).data.slots;
+  const services = (await ctx.call('GET', '/api/info')).data.services;
+  const booked = await ctx.call('POST', '/api/bookings', {
+    ...customer,
+    email: 'max@example.de',
+    slotId: slots[0].id,
+    serviceId: services[0].id,
+  });
+  assert.equal(booked.data.confirmationEmail, false);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(sent.length, 0);
 });

@@ -64,6 +64,32 @@ function weekday(date) {
   return wd === 0 ? 7 : wd;
 }
 
+const WEEKDAYS_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+const WEEKDAYS_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+/** "Dienstag, 24. November 2026" */
+function fmtDateLong(date) {
+  const [y, m, d] = date.split('-').map(Number);
+  return `${WEEKDAYS_LONG[weekday(date) - 1]}, ${d}. ${MONTHS[m - 1]} ${y}`;
+}
+
+/** "Di, 24.11." */
+function fmtDateShort(date) {
+  const [, m, d] = date.split('-').map(Number);
+  return `${WEEKDAYS_SHORT[weekday(date) - 1]}, ${d}.${m}.`;
+}
+
+/** 1000 → "10 €", 1050 → "10,50 €" */
+function fmtEuro(cents) {
+  const v = cents / 100;
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: Number.isInteger(v) ? 0 : 2,
+  }).format(v);
+}
+
 /** Text säubern und kürzen. Gibt '' zurück, wenn nichts Brauchbares kommt. */
 function cleanText(value, max) {
   if (typeof value !== 'string') return '';
@@ -85,8 +111,9 @@ function isPlausiblePhone(s) {
   return /^[0-9+()\/\-\s.]{6,30}$/.test(s) && (s.match(/\d/g) || []).length >= 6;
 }
 
+// Keine Kommas, Klammern o. Ä., damit nie mehrere Empfänger daraus werden.
 function isPlausibleEmail(s) {
-  return /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(s);
+  return /^[^\s@,;:<>()[\]\\"]{1,64}@[^\s@,;:<>()[\]\\"]{1,190}\.[^\s@,;:<>()[\]\\".]{2,}$/.test(s);
 }
 
 /** Sehr einfache Begrenzung von Anfragen pro Schlüssel (z. B. IP-Adresse). */
@@ -117,6 +144,9 @@ module.exports = {
   fromMinutes,
   addDays,
   weekday,
+  fmtDateLong,
+  fmtDateShort,
+  fmtEuro,
   cleanText,
   parseEuro,
   isPlausiblePhone,

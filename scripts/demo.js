@@ -77,8 +77,12 @@ for (const t of ['08:00', '08:30']) {
   }
 }
 
-const app = createApp({ db, adminPassword: 'demo', timeZone });
 const port = Number(process.env.PORT) || 3000;
+// In der Demo werden E-Mails nicht verschickt, sondern hier im Fenster angezeigt.
+const sendMail = async (m) => {
+  console.log(`\n--- E-Mail an ${m.to.address} ---\nBetreff: ${m.subject}\n\n${m.text}---`);
+};
+const app = createApp({ db, adminPassword: 'demo', timeZone, sendMail, publicUrl: `http://localhost:${port}` });
 app.listen(port, () => {
   console.log(`Demo läuft: http://localhost:${port}/  ·  Mein Bereich: http://localhost:${port}/admin  (Passwort: demo)`);
 });

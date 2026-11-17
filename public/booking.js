@@ -38,6 +38,7 @@ function renderInfo() {
   $('salon-name').textContent = salonName;
   $('footer-name').textContent = salonName;
   $('info-text').textContent = infoText || '';
+  $('email-hint').hidden = !state.info.emailConfirmation;
   if (legalText) {
     $('legal-text').textContent = legalText;
     $('legal').hidden = false;
@@ -162,12 +163,12 @@ function renderDetails() {
   $('step-details').classList.toggle('is-locked', !ready);
   $('form').hidden = !ready;
   $('details-hint').hidden = ready;
-  if (!slot) $('details-hint').textContent = 'Bitte wählen Sie zuerst einen Termin.';
-  else if (!ready) $('details-hint').textContent = 'Bitte wählen Sie noch oben aus, was gemacht werden soll.';
+  if (!slot) $('details-hint').textContent = 'Bitte wähl zuerst einen Termin.';
+  else if (!ready) $('details-hint').textContent = 'Bitte wähl oben noch aus, was gemacht werden soll.';
   if (!ready) return;
   const svc = selectedService();
   fill($('summary'),
-    h('span', { class: 'muted small', text: 'Ihr Termin' }),
+    h('span', { class: 'muted small', text: 'Dein Termin' }),
     h('strong', { text: `${fmtDateLong(slot.date, false)}, ${slot.time} Uhr` }),
     svc ? h('span', { text: `${svc.name} · ${euro(svc.price, true)}` }) : null
   );
@@ -184,9 +185,9 @@ async function submitBooking(event) {
   showFormError('');
   const name = $('name').value.trim();
   const phone = $('phone').value.trim();
-  if (name.length < 2) return showFormError('Bitte geben Sie Ihren Namen ein.');
-  if (phone.replace(/\D/g, '').length < 6) return showFormError('Bitte geben Sie Ihre Telefonnummer ein.');
-  if (!$('consent').checked) return showFormError('Bitte bestätigen Sie die Speicherung Ihrer Angaben.');
+  if (name.length < 2) return showFormError('Bitte gib deinen Namen ein.');
+  if (phone.replace(/\D/g, '').length < 6) return showFormError('Bitte gib deine Telefonnummer ein.');
+  if (!$('consent').checked) return showFormError('Bitte bestätige, dass deine Angaben gespeichert werden dürfen.');
 
   const btn = $('submit');
   btn.disabled = true;
@@ -270,12 +271,15 @@ function showConfirmation(result) {
   );
   fill($('done'),
     h('div', { class: 'tick' }, icon('check')),
-    h('h2', { text: 'Vielen Dank – Ihr Termin ist gebucht!' }),
+    h('h2', { text: 'Danke – dein Termin ist gebucht!' }),
     h('p', { class: 'when', text: `${fmtDateLong(result.date)}, ${result.time} Uhr` }),
     result.serviceName ? h('p', { class: 'muted', text: result.serviceName }) : null,
+    result.confirmationEmail
+      ? h('p', { class: 'muted small', text: 'Eine Bestätigung ist per E-Mail zu dir unterwegs.' })
+      : null,
     h('p', {
       class: 'muted small',
-      text: 'Falls Sie nicht können, sagen Sie bitte über diesen Link ab. Am besten speichern Sie ihn:',
+      text: 'Falls du nicht kannst, sag bitte über diesen Link ab. Am besten speicherst du ihn dir:',
     }),
     h('div', { class: 'link-box' }, h('a', { href: url, text: url })),
     h('div', { class: 'actions' }, calendar, copy)
@@ -339,16 +343,16 @@ async function renderManage(token) {
   } catch (err) {
     fill(box,
       h('h2', { class: 'step-head', text: 'Termin nicht gefunden' }),
-      h('p', { class: 'muted', text: 'Bitte prüfen Sie den Link oder buchen Sie einfach neu.' }),
+      h('p', { class: 'muted', text: 'Bitte prüf den Link oder buch einfach neu.' }),
       newBookingButton()
     );
     return;
   }
 
   const head = {
-    booked: 'Ihr Termin',
+    booked: 'Dein Termin',
     cancelled: 'Dieser Termin wurde abgesagt',
-    done: 'Danke für Ihren Besuch!',
+    done: 'Danke für deinen Besuch!',
     no_show: 'Dieser Termin ist vorbei',
   }[b.status];
 
@@ -365,7 +369,7 @@ async function renderManage(token) {
       class: 'btn btn-danger',
       text: 'Termin absagen',
       onclick: async () => {
-        if (!confirm('Möchten Sie diesen Termin wirklich absagen?')) return;
+        if (!confirm('Möchtest du diesen Termin wirklich absagen?')) return;
         cancel.disabled = true;
         try {
           await api(`/api/bookings/${encodeURIComponent(token)}/cancel`, { method: 'POST' });
@@ -383,7 +387,7 @@ async function renderManage(token) {
     parts.push(
       h('p', {
         class: 'alert alert-warn',
-        text: 'Online absagen geht so kurzfristig leider nicht mehr. Bitte rufen Sie kurz an.',
+        text: 'Online absagen geht so kurzfristig leider nicht mehr. Bitte ruf kurz an.',
       })
     );
   }

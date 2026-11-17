@@ -6,7 +6,7 @@ const Database = require('better-sqlite3');
 
 const DEFAULT_SETTINGS = {
   salon_name: 'Mein Friseursalon',
-  info_text: 'Wählen Sie einfach einen freien Termin aus. Bei Fragen erreichen Sie mich telefonisch.',
+  info_text: 'Such dir einfach einen freien Termin aus. Bei Fragen erreichst du mich telefonisch.',
   legal_text: '',
   booking_lead_minutes: '60',
   booking_days_ahead: '60',
@@ -14,10 +14,8 @@ const DEFAULT_SETTINGS = {
 };
 
 const DEFAULT_SERVICES = [
-  ['Herrenhaarschnitt', 2500],
-  ['Damenhaarschnitt', 4500],
-  ['Kinderhaarschnitt', 1800],
-  ['Bart', 1200],
+  ['Herrenhaarschnitt', 1000],
+  ['Haarschnitt + Bart', 1500],
 ];
 
 function openDatabase(dbPath) {

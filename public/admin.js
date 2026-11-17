@@ -651,7 +651,7 @@ async function loadStats() {
   );
 
   const whole = (cents) => euroFormatRound.format(Math.round(cents / 100));
-  const hero = tile(`Umsatz ${year}`, euro(st.total.revenue), `${numberFormat.format(st.total.count)} erledigte Termine`, true);
+  const hero = tile(`Umsatz ${year}`, euro(st.total.revenue, true), `${numberFormat.format(st.total.count)} erledigte Termine`, true);
   const tiles = [];
   if (year === currentYear) {
     const m = st.months[currentMonth - 1];

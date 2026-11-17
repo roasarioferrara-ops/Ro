@@ -86,7 +86,7 @@ async function api(path, { method = 'GET', body } = {}) {
     /* keine JSON-Antwort */
   }
   if (!res.ok) {
-    const err = new Error((data && data.error) || 'Verbindungsproblem. Bitte versuchen Sie es noch einmal.');
+    const err = new Error((data && data.error) || 'Verbindungsproblem. Bitte versuch es noch einmal.');
     err.status = res.status;
     throw err;
   }

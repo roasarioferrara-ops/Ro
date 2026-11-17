@@ -2,7 +2,8 @@
 
 Eine kleine Webseite zum Buchen von Friseurterminen.
 
-- **Kunden** sehen nur die Termine, die du freigegeben hast, wählen Leistung und Uhrzeit und buchen mit Name und Telefonnummer. Über einen persönlichen Link können sie wieder absagen.
+- **Kunden** sehen nur die Termine, die du freigegeben hast, wählen Leistung und Uhrzeit und buchen mit Name und Telefonnummer. Über einen persönlichen Link können sie wieder absagen. Wer eine E-Mail-Adresse angibt, bekommt eine Bestätigung per E-Mail (sobald der Versand eingerichtet ist, siehe unten).
+- Kunden werden mit **„du“** angesprochen.
 - **Du** hast einen eigenen, passwortgeschützten Bereich unter `/admin`. Kunden sehen davon nichts.
 
 ## Was dein Bereich kann
@@ -31,7 +32,7 @@ Dann im Browser öffnen:
 - Buchungsseite: http://localhost:3000/
 - Dein Bereich: http://localhost:3000/admin (Passwort: `demo`)
 
-Die Demo füllt eine eigene Datenbank (`data/demo.db`) mit Beispieldaten und wird bei jedem Start neu angelegt.
+Die Demo füllt eine eigene Datenbank (`data/demo.db`) mit Beispieldaten und wird bei jedem Start neu angelegt. Bestätigungs-E-Mails werden in der Demo nicht verschickt, sondern im Terminal-Fenster angezeigt.
 
 ## Richtig starten
 
@@ -51,8 +52,24 @@ Einstellungen über Umgebungsvariablen:
 | `TIMEZONE` | Zeitzone des Salons | `Europe/Berlin` |
 | `DB_PATH` | Speicherort der Datenbank | `./data/salon.db` |
 | `TRUST_PROXY` | Anzahl vorgeschalteter Proxys (bei Hostern meist 1) | `1` |
+| `PUBLIC_URL` | Adresse der Webseite, z. B. `https://termine.mein-salon.de` (für den Link in der E-Mail) | – |
+| `SMTP_HOST`, `SMTP_PORT` | Postausgangsserver deines E-Mail-Anbieters | –, `465` |
+| `SMTP_USER`, `SMTP_PASS` | Zugangsdaten des Postfachs, von dem die Bestätigungen kommen | – |
+| `MAIL_FROM` | Absenderadresse (wenn anders als `SMTP_USER`) | `SMTP_USER` |
 
 Alle Daten liegen in **einer Datei** (`data/salon.db`). Die solltest du regelmäßig sichern.
+
+## Bestätigung per E-Mail
+
+Wenn `SMTP_HOST` und `PUBLIC_URL` gesetzt sind, bekommt jeder Kunde, der online bucht und eine E-Mail-Adresse angibt, sofort eine Bestätigung:
+
+- Datum, Uhrzeit und Leistung mit Preis,
+- den Link zum Absagen,
+- einen Kalendereintrag zum Anhängen (`termin.ics`).
+
+Absender ist der Name deines Salons. Die Zugangsdaten (Server, Benutzer, Passwort) bekommst du von deinem E-Mail-Anbieter. Am besten nimmst du ein eigenes Postfach für den Salon. Ohne diese Angaben läuft alles wie bisher, nur ohne E-Mail. Beim Start steht im Protokoll, ob der Versand klappt („E-Mail-Versand bereit.“).
+
+Erinnerungen vor dem Termin gibt es nicht.
 
 ## Online stellen
 
@@ -66,13 +83,13 @@ Wichtig dabei:
 1. `NODE_ENV=production` und ein sicheres `ADMIN_PASSWORD` setzen.
 2. Die Seite nur über **HTTPS** erreichbar machen (bieten die meisten Hoster automatisch an).
 3. `DB_PATH` auf den dauerhaften Speicher zeigen lassen.
-4. Unter **Einstellungen** dein **Impressum** und deine **Datenschutzerklärung** eintragen. Für Webseiten in Deutschland ist das Pflicht.
+4. Unter **Einstellungen** dein **Impressum** und deine **Datenschutzerklärung** eintragen. Für Webseiten in Deutschland ist das Pflicht. Wenn du Bestätigungs-E-Mails verschickst, gehört auch das in die Datenschutzerklärung.
 
 Die Seite lädt keine fremden Schriften oder Skripte (kein Google Fonts usw.), damit keine Kundendaten an Dritte gehen.
 
 ## Technik
 
-- Node.js mit Express, Datenbank SQLite (`better-sqlite3`)
+- Node.js mit Express, Datenbank SQLite (`better-sqlite3`), E-Mails mit `nodemailer`
 - Oberfläche: einfaches HTML, CSS und JavaScript ohne Build-Schritt (`public/`)
 - Funktioniert auf dem Handy und am PC, mit hellem und dunklem Modus
 - Tests: `npm test`
@@ -81,6 +98,7 @@ Die Seite lädt keine fremden Schriften oder Skripte (kein Google Fonts usw.), d
 server.js        Webserver und alle Schnittstellen (API)
 db.js            Datenbank-Aufbau
 lib.js           Hilfsfunktionen (Zeit, Prüfungen, Geld)
+mail.js          Bestätigungs-E-Mail
 public/          Buchungsseite (index.html, booking.js) und dein Bereich (admin.html, admin.js)
 scripts/demo.js  Demo mit Beispieldaten
 test/            Automatische Tests
