@@ -51,8 +51,8 @@ Einstellungen über Umgebungsvariablen:
 | `PORT` | Port der Webseite | `3000` |
 | `TIMEZONE` | Zeitzone des Salons | `Europe/Berlin` |
 | `DB_PATH` | Speicherort der Datenbank | `./data/salon.db` |
-| `TRUST_PROXY` | Anzahl vorgeschalteter Proxys (bei Hostern meist 1) | `1` |
-| `PUBLIC_URL` | Adresse der Webseite, z. B. `https://termine.mein-salon.de` (für den Link in der E-Mail) | – |
+| `TRUST_PROXY` | Wie die echte Adresse der Besucher erkannt wird: `auto` (Proxy des Hosters, bei Bedarf plus Cloudflare), eine Zahl oder `false` ohne Proxy | `auto` |
+| `PUBLIC_URL` | Adresse der Webseite, z. B. `https://termine.mein-salon.de` (für den Link in der E-Mail). Bei Render automatisch. | – |
 | `SMTP_HOST`, `SMTP_PORT` | Postausgangsserver deines E-Mail-Anbieters | –, `465` |
 | `SMTP_USER`, `SMTP_PASS` | Zugangsdaten des Postfachs, von dem die Bestätigungen kommen | – |
 | `MAIL_FROM` | Absenderadresse (wenn anders als `SMTP_USER`) | `SMTP_USER` |
@@ -71,7 +71,25 @@ Absender ist der Name deines Salons. Die Zugangsdaten (Server, Benutzer, Passwor
 
 Erinnerungen vor dem Termin gibt es nicht.
 
-## Online stellen
+## Online stellen mit Render
+
+Die Datei `render.yaml` enthält schon alles, was Render braucht: Rechenzentrum Frankfurt, dauerhafter Speicher für die Datenbank, sichere Verbindung (https). Kosten: das Paket „Starter“ (zurzeit 7 $ im Monat) plus 1 GB Speicher (ein paar Cent).
+
+1. Auf [render.com](https://render.com) mit **„GitHub“** anmelden und Render Zugriff auf dieses Repository geben.
+2. Unter **Billing** eine Zahlungsart hinterlegen.
+3. **New → Blueprint** wählen, dieses Repository und den Branch mit dem Code auswählen.
+4. Render fragt nach drei Werten:
+   - `ADMIN_PASSWORD`: ein langes Passwort für deinen Bereich (mindestens 10 Zeichen, gut merken),
+   - `SMTP_USER`: deine web.de-Adresse,
+   - `SMTP_PASS`: das Passwort dieses web.de-Postfachs.
+5. **Apply** klicken. Nach ein paar Minuten ist die Seite unter `https://friseur-termine….onrender.com` erreichbar (die genaue Adresse zeigt Render an).
+6. Dort unter `/admin` anmelden und unter **Einstellungen** Salonname, Hinweise, Impressum und Datenschutz eintragen.
+
+**web.de vorbereiten:** Damit die Seite über dein web.de-Postfach Bestätigungen verschicken darf, musst du bei web.de unter **Einstellungen → POP3/IMAP Abruf** den Zugriff über POP3 und IMAP erlauben. Wenn du bei web.de die Anmeldung in zwei Schritten nutzt, brauchst du statt deines normalen Passworts ein eigenes Anwendungspasswort. Ob es klappt, steht nach dem Start im Protokoll (**Logs**) bei Render: „E-Mail-Versand bereit.“
+
+Wenn du die E-Mail-Felder leer lässt, läuft alles, nur ohne Bestätigungs-E-Mail. Du kannst die Werte später unter **Environment** bei Render ändern.
+
+## Online stellen (allgemein)
 
 Damit Kunden die Seite erreichen, muss sie auf einem Server laufen, der dauerhaft Dateien speichern kann (wegen der Datenbank). Möglich sind zum Beispiel:
 
@@ -101,6 +119,7 @@ lib.js           Hilfsfunktionen (Zeit, Prüfungen, Geld)
 mail.js          Bestätigungs-E-Mail
 public/          Buchungsseite (index.html, booking.js) und dein Bereich (admin.html, admin.js)
 scripts/demo.js  Demo mit Beispieldaten
+render.yaml      Einrichtung für Render
 test/            Automatische Tests
 ```
 

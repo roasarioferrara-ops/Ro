@@ -45,7 +45,7 @@ function createApp({
   adminPassword,
   timeZone = 'Europe/Berlin',
   clock = () => Date.now(),
-  trustProxy = 1,
+  trustProxy = 'auto', // 'auto' = Proxy des Hosters (+ Cloudflare), sonst Express-Einstellung
   sendMail = null, // Funktion zum Verschicken von E-Mails (siehe mail.js) oder null
   publicUrl = null, // Adresse der Webseite, z. B. https://termine.mein-salon.de – für Links in E-Mails
 }) {
@@ -57,7 +57,7 @@ function createApp({
 
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', trustProxy);
+  app.set('trust proxy', trustProxy === 'auto' ? L.trustHostingProxies : trustProxy);
 
   const bookingLimiter = L.createRateLimiter({ limit: 10, windowMs: 60 * 60 * 1000 });
   const loginLimiter = L.createRateLimiter({ limit: 10, windowMs: 15 * 60 * 1000 });
@@ -804,8 +804,13 @@ if (require.main === module) {
     console.warn('⚠  Kein ADMIN_PASSWORD gesetzt – zum Testen gilt das Passwort "admin".');
   }
   const db = openDatabase(process.env.DB_PATH || path.join(__dirname, 'data', 'salon.db'));
-  const trustProxy = process.env.TRUST_PROXY === undefined ? 1 : toInt(process.env.TRUST_PROXY, 0);
-  const publicUrl = process.env.PUBLIC_URL || null;
+  const tp = (process.env.TRUST_PROXY || 'auto').trim().toLowerCase();
+  const trustProxy = tp === 'auto' ? 'auto' : tp === 'false' ? false : toInt(tp, 0);
+  // Bei Render ist die Adresse der Webseite automatisch bekannt.
+  const publicUrl = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || null;
+  if (isProd && adminPassword.length < 10) {
+    console.warn('⚠  Das ADMIN_PASSWORD ist sehr kurz. Bitte nimm mindestens 10 Zeichen.');
+  }
   const sendMail = createMailerFromEnv(process.env);
   if (sendMail && !publicUrl) {
     console.warn('⚠  SMTP ist eingerichtet, aber PUBLIC_URL fehlt – es werden keine Bestätigungen verschickt.');

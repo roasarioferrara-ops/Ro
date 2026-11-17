@@ -116,6 +116,45 @@ function isPlausibleEmail(s) {
   return /^[^\s@,;:<>()[\]\\"]{1,64}@[^\s@,;:<>()[\]\\"]{1,190}\.[^\s@,;:<>()[\]\\".]{2,}$/.test(s);
 }
 
+// ---------- Echte IP-Adresse der Besucher hinter dem Hoster ----------
+
+const net = require('node:net');
+
+// Private Netze (interne Proxys des Hosters) und Cloudflare (sitzt z. B. bei Render vor jeder App).
+// Cloudflare-Adressen: https://www.cloudflare.com/ips/
+const KNOWN_PROXY_NETS = [
+  '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', '100.64.0.0/10', '169.254.0.0/16',
+  'fc00::/7', 'fe80::/10', '::1/128',
+  '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18',
+  '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17',
+  '162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+  '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32',
+  '2a06:98c0::/29', '2c0f:f248::/32',
+];
+const knownProxies = new net.BlockList();
+for (const cidr of KNOWN_PROXY_NETS) {
+  const [address, prefix] = cidr.split('/');
+  knownProxies.addSubnet(address, Number(prefix), address.includes(':') ? 'ipv6' : 'ipv4');
+}
+
+function isKnownProxy(address) {
+  const addr = String(address).replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/i, '');
+  if (net.isIPv4(addr)) return knownProxies.check(addr, 'ipv4');
+  if (net.isIPv6(addr)) return knownProxies.check(addr, 'ipv6');
+  return false;
+}
+
+/**
+ * Für Express' "trust proxy": Wem glauben wir die Angabe X-Forwarded-For?
+ * - immer dem direkten Absender (dem Proxy des Hosters),
+ * - dahinter genau einem weiteren Proxy, aber nur, wenn er aus einem privaten Netz oder von Cloudflare kommt.
+ * So wird bei Render (Cloudflare → Render → App) und bei Hostern mit einem Proxy die echte Adresse
+ * erkannt, und niemand kann sich mit einer selbst geschickten Angabe eine andere Adresse geben.
+ */
+function trustHostingProxies(address, hop) {
+  return hop === 0 || (hop === 1 && isKnownProxy(address));
+}
+
 /** Sehr einfache Begrenzung von Anfragen pro Schlüssel (z. B. IP-Adresse). */
 function createRateLimiter({ limit, windowMs }) {
   const hits = new Map();
@@ -152,4 +191,6 @@ module.exports = {
   isPlausiblePhone,
   isPlausibleEmail,
   createRateLimiter,
+  isKnownProxy,
+  trustHostingProxies,
 };

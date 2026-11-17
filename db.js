@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const DEFAULT_SERVICES = [
-  ['Herrenhaarschnitt', 1000],
+  ['Haarschnitt', 1000],
   ['Haarschnitt + Bart', 1500],
 ];
 

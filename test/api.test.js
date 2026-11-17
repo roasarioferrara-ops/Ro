@@ -135,7 +135,7 @@ test('Erledigte Termine zählen in Monats- und Jahresstatistik', async (t) => {
   t.after(ctx.close);
   await ctx.login();
   const services = (await ctx.call('GET', '/api/info')).data.services;
-  const herren = services.find((s) => s.name === 'Herrenhaarschnitt');
+  const herren = services.find((s) => s.name === 'Haarschnitt');
 
   await ctx.call('POST', '/api/admin/slots', { date: '2026-11-17', time: '11:00', duration: 30 });
   await ctx.call('POST', '/api/admin/slots', { date: '2026-11-17', time: '12:00', duration: 30 });
@@ -271,7 +271,7 @@ test('Bestätigung per E-Mail nach der Online-Buchung', async (t) => {
 
   const info = (await ctx.call('GET', '/api/info')).data;
   assert.equal(info.emailConfirmation, true);
-  const herren = info.services.find((s) => s.name === 'Herrenhaarschnitt');
+  const herren = info.services.find((s) => s.name === 'Haarschnitt');
   assert.equal(herren.price, 1000);
 
   await ctx.call('POST', '/api/admin/slots', { date: '2026-11-24', time: '10:00', duration: 30 });
@@ -300,7 +300,7 @@ test('Bestätigung per E-Mail nach der Online-Buchung', async (t) => {
   assert.equal(mail.subject, 'Dein Termin am Di, 24.11. um 10:30 Uhr');
   assert.match(mail.text, /^Hallo Max Klick hier,\n/);
   assert.match(mail.text, /Dienstag, 24\. November 2026, 10:30 Uhr/);
-  assert.match(mail.text, /Herrenhaarschnitt \(10\s€\)/);
+  assert.match(mail.text, / {4}Haarschnitt \(10\s€\)/);
   assert.ok(mail.text.includes(`https://termine.example.de/termin/${booked.data.token}`));
   const ics = mail.attachments[0].content;
   assert.match(ics, /DTSTART:20261124T103000/);

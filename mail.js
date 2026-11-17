@@ -8,18 +8,23 @@ const L = require('./lib');
  * Baut aus den Umgebungsvariablen eine Funktion zum Verschicken von E-Mails.
  * Gibt null zurück, wenn kein SMTP_HOST gesetzt ist.
  */
-function createMailerFromEnv(env = process.env) {
+function createMailerFromEnv(env = process.env, log = console) {
   if (!env.SMTP_HOST) return null;
+  const fromAddress = (env.MAIL_FROM || env.SMTP_USER || '').trim();
+  if (!fromAddress || (env.SMTP_USER && !env.SMTP_PASS)) {
+    log.warn('⚠  E-Mail-Versand ist aus: SMTP_USER und SMTP_PASS (oder MAIL_FROM) fehlen.');
+    return null;
+  }
   const nodemailer = require('nodemailer');
   const port = Number.parseInt(env.SMTP_PORT || '465', 10);
+  const secure = env.SMTP_SECURE ? env.SMTP_SECURE === 'true' : port === 465;
   const transport = nodemailer.createTransport({
     host: env.SMTP_HOST,
     port,
-    secure: env.SMTP_SECURE ? env.SMTP_SECURE === 'true' : port === 465,
-    auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS || '' } : undefined,
+    secure,
+    requireTLS: !secure, // Ohne direkte Verschlüsselung muss STARTTLS klappen, sonst wird nichts gesendet.
+    auth: env.SMTP_USER ? { user: env.SMTP_USER.trim(), pass: env.SMTP_PASS } : undefined,
   });
-  const fromAddress = env.MAIL_FROM || env.SMTP_USER;
-  if (!fromAddress) throw new Error('Bitte MAIL_FROM oder SMTP_USER setzen.');
 
   const send = ({ fromName, ...message }) =>
     transport.sendMail({ from: { name: fromName || '', address: fromAddress }, ...message });
