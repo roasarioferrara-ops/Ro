@@ -1,0 +1,20 @@
+{
+  "name": "friseur-termine",
+  "version": "1.0.0",
+  "description": "Terminbuchung für Friseure: Kunden buchen freigegebene Termine, der Inhaber sieht erledigte Termine und Umsatz pro Monat und Jahr.",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js",
+    "demo": "node scripts/demo.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.2.0",
+    "express": "^5.3.0"
+  }
+}

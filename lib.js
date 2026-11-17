@@ -1,0 +1,125 @@
+'use strict';
+
+// Kleine Hilfsfunktionen: Zeit (in der Zeitzone des Salons), Prüfungen, Geld.
+
+function localParts(timeZone, date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const get = (type) => parts.find((p) => p.type === type).value;
+  return { date: `${get('year')}-${get('month')}-${get('day')}`, time: `${get('hour')}:${get('minute')}` };
+}
+
+/** "YYYY-MM-DD HH:MM" in der Salon-Zeitzone, optional um Minuten verschoben. */
+function localStamp(timeZone, offsetMinutes = 0, now = Date.now()) {
+  const p = localParts(timeZone, new Date(now + offsetMinutes * 60000));
+  return `${p.date} ${p.time}`;
+}
+
+const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+function isDate(s) {
+  if (typeof s !== 'string') return false;
+  const m = DATE_RE.exec(s);
+  if (!m) return false;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
+}
+
+function isTime(s) {
+  return typeof s === 'string' && TIME_RE.test(s);
+}
+
+function isMonth(s) {
+  return typeof s === 'string' && MONTH_RE.test(s);
+}
+
+function toMinutes(time) {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function fromMinutes(min) {
+  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+}
+
+function addDays(date, days) {
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return dt.toISOString().slice(0, 10);
+}
+
+/** ISO-Wochentag: 1 = Montag … 7 = Sonntag */
+function weekday(date) {
+  const [y, m, d] = date.split('-').map(Number);
+  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return wd === 0 ? 7 : wd;
+}
+
+/** Text säubern und kürzen. Gibt '' zurück, wenn nichts Brauchbares kommt. */
+function cleanText(value, max) {
+  if (typeof value !== 'string') return '';
+  return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim().slice(0, max);
+}
+
+/** "25", "25,50", "25.5", 25 → Cent. Ungültig → null */
+function parseEuro(value) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value >= 0 && value < 100000 ? Math.round(value * 100) : null;
+  }
+  if (typeof value !== 'string') return null;
+  const s = value.trim().replace(/\s|€/g, '').replace(',', '.');
+  if (!/^\d{1,5}(\.\d{1,2})?$/.test(s)) return null;
+  return Math.round(parseFloat(s) * 100);
+}
+
+function isPlausiblePhone(s) {
+  return /^[0-9+()\/\-\s.]{6,30}$/.test(s) && (s.match(/\d/g) || []).length >= 6;
+}
+
+function isPlausibleEmail(s) {
+  return /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(s);
+}
+
+/** Sehr einfache Begrenzung von Anfragen pro Schlüssel (z. B. IP-Adresse). */
+function createRateLimiter({ limit, windowMs }) {
+  const hits = new Map();
+  return function allow(key, now = Date.now()) {
+    const recent = (hits.get(key) || []).filter((t) => now - t < windowMs);
+    if (recent.length >= limit) {
+      hits.set(key, recent);
+      return false;
+    }
+    recent.push(now);
+    hits.set(key, recent);
+    if (hits.size > 10000) {
+      for (const [k, v] of hits) if (!v.some((t) => now - t < windowMs)) hits.delete(k);
+    }
+    return true;
+  };
+}
+
+module.exports = {
+  localParts,
+  localStamp,
+  isDate,
+  isTime,
+  isMonth,
+  toMinutes,
+  fromMinutes,
+  addDays,
+  weekday,
+  cleanText,
+  parseEuro,
+  isPlausiblePhone,
+  isPlausibleEmail,
+  createRateLimiter,
+};
